@@ -1165,7 +1165,8 @@ def save_full_state(args, accelerator, is_lora: bool, epoch: int, samples_seen: 
 
     # patch FSDP state dict method so it works correctly.
     def _get_state_dict_patched(model, unwrap=False):
-        return get_state_dict_unpatched(model, unwrap=unwrap)
+        with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT):
+            return model.state_dict()
 
     if args.distributed_training_framework == "fsdp":
         get_state_dict_unpatched = accelerator.get_state_dict
@@ -1219,7 +1220,9 @@ def load_latest_full_state(args, accelerator) -> None:
     latest = checkpoint_list[0]
 
     log_rank_0(f"\033[93mLoading state from: {latest}\033[0m", to_print=True)
-    accelerator.load_state(latest)
+
+    with FSDP.state_dict_type(model, StateDictType.FULL_STATE_DICT):
+        accelerator.load_state(latest)
 
     training_metadata = torch.load(latest / "training_metadata.json")
     log_rank_0(
